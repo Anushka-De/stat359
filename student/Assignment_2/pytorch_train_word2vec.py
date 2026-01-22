@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
+import pandas as pd
 from tqdm import tqdm
 
 # Hyperparameters (MUST MATCH HANDOUT)
@@ -18,41 +19,40 @@ NEGATIVE_SAMPLES = 5  # Number of negative samples per positive pair
 # -----------------------------
 class SkipGramDataset(Dataset):
     """
-    Returns (center_idx, context_idx) for each skip-gram pair.
+    Dataset of (center_idx, context_idx) pairs from processed_data.pkl.
     """
     def __init__(self, centers, contexts):
-        self.centers = torch.tensor(centers, dtype=torch.long)
-        self.contexts = torch.tensor(contexts, dtype=torch.long)
+        self.centers = torch.as_tensor(centers, dtype=torch.long)
+        self.contexts = torch.as_tensor(contexts, dtype=torch.long)
 
     def __len__(self):
-        return len(self.centers)
+        return self.centers.numel()
 
     def __getitem__(self, idx):
         return self.centers[idx], self.contexts[idx]
 
 
 # -----------------------------
-# Word2Vec Module (two embeddings)
+# Word2Vec Model (two embeddings)
 # forward: dot(center, context)
 # -----------------------------
 class Word2Vec(nn.Module):
-    def __init__(self, vocab_size, embedding_dim):
+    def __init__(self, vocab_size: int, embedding_dim: int):
         super().__init__()
-        self.in_embed = nn.Embedding(vocab_size, embedding_dim)   # center
-        self.out_embed = nn.Embedding(vocab_size, embedding_dim)  # context
+        self.in_embed = nn.Embedding(vocab_size, embedding_dim)   # center words
+        self.out_embed = nn.Embedding(vocab_size, embedding_dim)  # context words
 
-    def forward(self, center_idx, context_idx):
+    def forward(self, center_idx: torch.Tensor, context_idx: torch.Tensor) -> torch.Tensor:
         """
-        Returns logits = dot(input_embedding(center), output_embedding(context))
+        Returns dot product logits for (center, context).
         Shape: [batch]
         """
-        v = self.in_embed(center_idx)     # [B, D]
-        u = self.out_embed(context_idx)   # [B, D]
-        logits = (v * u).sum(dim=1)       # [B]
-        return logits
+        v = self.in_embed(center_idx)    # [B, D]
+        u = self.out_embed(context_idx)  # [B, D]
+        return (v * u).sum(dim=1)        # [B]
 
     def get_embeddings(self):
-        # Save input embeddings (standard)
+        # Standard: save input embeddings
         return self.in_embed.weight.detach().cpu().numpy()
 
 
@@ -62,67 +62,82 @@ class Word2Vec(nn.Module):
 with open("processed_data.pkl", "rb") as f:
     data = pickle.load(f)
 
-# --- Robustly locate skip-gram pairs and vocab ---
-# Try common key names; adapt if your data.py used different ones.
-def first_existing_key(d, keys):
-    for k in keys:
-        if k in d:
-            return k
-    return None
+# Find the skip-gram pairs DataFrame inside the pickle.
+pairs = None
+if isinstance(data, pd.DataFrame):
+    pairs = data
+elif isinstance(data, dict):
+    # common key names
+    for k in ["skipgram_pairs", "pairs", "skip_gram_pairs", "skipgrams", "df"]:
+        if k in data and isinstance(data[k], pd.DataFrame):
+            pairs = data[k]
+            break
+    # otherwise: first DataFrame value in dict
+    if pairs is None:
+        for v in data.values():
+            if isinstance(v, pd.DataFrame):
+                pairs = v
+                break
 
-center_key = first_existing_key(data, ["centers", "center_words", "center", "X_center"])
-context_key = first_existing_key(data, ["contexts", "context_words", "context", "X_context"])
-if center_key is None or context_key is None:
-    raise KeyError(
-        f"Could not find skip-gram pair keys in processed_data.pkl. Found keys: {list(data.keys())}. "
-        "Expected something like centers/contexts or center_words/context_words."
+if pairs is None:
+    raise ValueError(
+        "Could not find skip-gram pairs DataFrame in processed_data.pkl. "
+        "Expected a pandas DataFrame with columns ['center','context']."
     )
 
-centers = data[center_key]
-contexts = data[context_key]
+if "center" not in pairs.columns or "context" not in pairs.columns:
+    raise ValueError(f"Skip-gram DataFrame must have columns ['center','context'], got {list(pairs.columns)}")
 
-if "word2idx" not in data or "idx2word" not in data:
-    raise KeyError("processed_data.pkl must contain 'word2idx' and 'idx2word' mappings.")
+centers = pairs["center"].to_numpy()
+contexts = pairs["context"].to_numpy()
 
-vocab_size = len(data["word2idx"])
+# vocab mappings
+if not isinstance(data, dict) or "word2idx" not in data or "idx2word" not in data:
+    raise KeyError("processed_data.pkl must include 'word2idx' and 'idx2word' dictionaries for saving embeddings.")
+
+vocab_size = data.get("vocab_size", len(data["word2idx"]))
+
 
 # -----------------------------
 # Precompute negative sampling distribution (unigram^(3/4))
 # -----------------------------
-# Handout says: use word frequency counts; may be in data dict or build from pairs. :contentReference[oaicite:2]{index=2}
-freq_key = first_existing_key(data, ["word_counts", "counts", "freq", "frequency", "unigram_counts"])
-if freq_key is not None:
-    # Expect dict-like mapping index->count or word->count; handle both.
-    freq_obj = data[freq_key]
-    counts = torch.zeros(vocab_size, dtype=torch.float)
-    if isinstance(freq_obj, dict):
-        # If keys are ints (indices)
-        if all(isinstance(k, int) for k in freq_obj.keys()):
-            for idx, c in freq_obj.items():
-                if 0 <= idx < vocab_size:
-                    counts[idx] = float(c)
+# Prefer precomputed counts if present; otherwise build from pairs.
+counts = None
+for k in ["word_counts", "counts", "freq", "frequency", "unigram_counts"]:
+    if isinstance(data, dict) and k in data:
+        obj = data[k]
+        # dict: can be idx->count or word->count
+        if isinstance(obj, dict):
+            c = torch.zeros(vocab_size, dtype=torch.float)
+            if all(isinstance(kk, int) for kk in obj.keys()):
+                for idx, val in obj.items():
+                    if 0 <= idx < vocab_size:
+                        c[idx] = float(val)
+            else:
+                # word -> count
+                for w, val in obj.items():
+                    if w in data["word2idx"]:
+                        c[data["word2idx"][w]] = float(val)
+            counts = c
         else:
-            # keys are words; map via word2idx
-            for w, c in freq_obj.items():
-                if w in data["word2idx"]:
-                    counts[data["word2idx"][w]] = float(c)
-    else:
-        # If it's already a list/array aligned to vocab
-        counts = torch.tensor(freq_obj, dtype=torch.float)
-        if counts.numel() != vocab_size:
-            raise ValueError("Frequency array length doesn't match vocab_size.")
-else:
-    # Build counts from centers and contexts (both are indices)
-    counts = torch.zeros(vocab_size, dtype=torch.float)
-    # Count appearances in pairs (simple approximation)
-    for idx in centers:
-        counts[int(idx)] += 1.0
-    for idx in contexts:
-        counts[int(idx)] += 1.0
+            # list/array aligned to vocab
+            t = torch.tensor(obj, dtype=torch.float)
+            if t.numel() == vocab_size:
+                counts = t
+        break
 
-# Apply 3/4 smoothing and normalize
-neg_sampling_dist = counts.pow(0.75)
-neg_sampling_dist = neg_sampling_dist / neg_sampling_dist.sum()
+if counts is None:
+    # build counts from skip-gram indices (fast)
+    c_centers = torch.bincount(torch.as_tensor(centers, dtype=torch.long), minlength=vocab_size).float()
+    c_contexts = torch.bincount(torch.as_tensor(contexts, dtype=torch.long), minlength=vocab_size).float()
+    counts = c_centers + c_contexts
+
+# unigram^(3/4)
+neg_dist = counts.pow(0.75)
+neg_dist_sum = neg_dist.sum()
+if neg_dist_sum.item() == 0:
+    raise ValueError("Negative sampling distribution sum is zero; counts appear to be empty.")
+neg_dist = neg_dist / neg_dist_sum  # probability distribution over vocab
 
 
 # -----------------------------
@@ -153,61 +168,78 @@ criterion = nn.BCEWithLogitsLoss()
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
 
-def sample_negatives(batch_size, num_negatives, dist, device):
+def sample_negative_context(batch_size: int, num_neg: int, dist: torch.Tensor, device: torch.device) -> torch.Tensor:
     """
-    Sample negative word indices using torch.multinomial.
-    Returns shape: [B * num_negatives]
+    Samples negative context word indices using torch.multinomial.
+    Returns shape: [B, num_neg]
     """
-    # multinomial expects probabilities on CPU ok; move to device after sampling
-    neg = torch.multinomial(dist, batch_size * num_negatives, replacement=True)
+    # multinomial operates on CPU tensor fine; move sampled indices to device
+    neg = torch.multinomial(dist, batch_size * num_neg, replacement=True).view(batch_size, num_neg)
     return neg.to(device)
+
+
+def make_targets(pos_logits: torch.Tensor, neg_logits: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Build concatenated logits and targets for BCEWithLogitsLoss.
+    pos_logits: [B]
+    neg_logits: [B, K]
+    returns:
+      logits:  [B + B*K]
+      targets: [B + B*K]
+    """
+    bsz = pos_logits.shape[0]
+    k = neg_logits.shape[1]
+    logits = torch.cat([pos_logits, neg_logits.reshape(-1)], dim=0)  # [B + B*K]
+    targets = torch.cat(
+        [torch.ones(bsz, device=pos_logits.device), torch.zeros(bsz * k, device=pos_logits.device)],
+        dim=0,
+    )
+    return logits, targets
 
 
 # -----------------------------
 # Training loop
 # -----------------------------
 model.train()
+
 for epoch in range(EPOCHS):
     total_loss = 0.0
-    pbar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{EPOCHS}", leave=False)
 
-    for center_batch, context_batch in pbar:
-        center_batch = center_batch.to(device)   # [B]
-        context_batch = context_batch.to(device) # [B]
+    for center_batch, context_batch in tqdm(dataloader, desc=f"Epoch {epoch+1}/{EPOCHS}"):
+        center_batch = center_batch.to(device)     # [B]
+        context_batch = context_batch.to(device)   # [B]
 
-        # Positive logits and labels (1)
-        pos_logits = model(center_batch, context_batch)           # [B]
-        pos_labels = torch.ones_like(pos_logits, device=device)   # [B]
+        # Positive logits: dot(center, true_context)
+        pos_logits = model(center_batch, context_batch)  # [B]
 
-        # Negative sampling: sample NEGATIVE_SAMPLES per positive
-        neg_context = sample_negatives(BATCH_SIZE, NEGATIVE_SAMPLES, neg_sampling_dist, device)
-        # Repeat centers to match negatives
-        neg_center = center_batch.repeat_interleave(NEGATIVE_SAMPLES)  # [B*NEG]
-        # logits for negative pairs
-        neg_logits = model(neg_center, neg_context)                    # [B*NEG]
-        neg_labels = torch.zeros_like(neg_logits, device=device)       # [B*NEG]
+        # Negative samples for each positive pair
+        neg_context = sample_negative_context(BATCH_SIZE, NEGATIVE_SAMPLES, neg_dist, device)  # [B, K]
 
-        # Optional: ensure negatives do not equal the true context (handout note) :contentReference[oaicite:3]{index=3}
-        # Simple fix: if any sampled negative equals the positive context for that center,
-        # resample those positions once (good enough for coursework).
-        with torch.no_grad():
-            pos_context_rep = context_batch.repeat_interleave(NEGATIVE_SAMPLES)
-            mask = neg_context.eq(pos_context_rep)
-            if mask.any():
-                neg_context2 = sample_negatives(int(mask.sum().item()), 1, neg_sampling_dist, device).view(-1)
-                neg_context[mask] = neg_context2
+        # Ensure negatives don't include the actual positive context word (resample masked positions)
+        # (Usually very rare, but required by handout.)
+        for _ in range(3):  # a few attempts is enough
+            mask = neg_context.eq(context_batch.unsqueeze(1))  # [B, K]
+            if not mask.any():
+                break
+            # resample only the masked positions
+            num_bad = int(mask.sum().item())
+            replacement = torch.multinomial(neg_dist, num_bad, replacement=True).to(device)
+            neg_context[mask] = replacement
 
-        # Compute losses
-        loss_pos = criterion(pos_logits, pos_labels)
-        loss_neg = criterion(neg_logits, neg_labels)
-        loss = loss_pos + loss_neg
+        # Compute negative logits: dot(center, sampled_context)
+        center_emb = model.in_embed(center_batch)           # [B, D]
+        neg_emb = model.out_embed(neg_context)              # [B, K, D]
+        neg_logits = (neg_emb * center_emb.unsqueeze(1)).sum(dim=2)  # [B, K]
+
+        # BCE loss over combined logits/targets
+        logits, targets = make_targets(pos_logits, neg_logits)
+        loss = criterion(logits, targets)
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
         total_loss += loss.item()
-        pbar.set_postfix(loss=loss.item())
 
     avg_loss = total_loss / len(dataloader)
     print(f"Epoch {epoch+1}/{EPOCHS} - avg loss: {avg_loss:.4f}")
@@ -218,8 +250,6 @@ for epoch in range(EPOCHS):
 # -----------------------------
 embeddings = model.get_embeddings()
 with open("word2vec_embeddings.pkl", "wb") as f:
-    pickle.dump(
-        {"embeddings": embeddings, "word2idx": data["word2idx"], "idx2word": data["idx2word"]},
-        f
-    )
+    pickle.dump({"embeddings": embeddings, "word2idx": data["word2idx"], "idx2word": data["idx2word"]}, f)
+
 print("Embeddings saved to word2vec_embeddings.pkl")
