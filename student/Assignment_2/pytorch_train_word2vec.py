@@ -24,6 +24,8 @@ class Word2Vec(nn.Module):
 
 
 # Load processed data
+with open('processed_data.pkl', 'rb') as f:
+    data = pickle.load(f)
 
 # Precompute negative sampling distribution below
 
