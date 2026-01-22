@@ -24,12 +24,6 @@ class Word2Vec(nn.Module):
 
 
 # Load processed data
-with open('word2vec_embeddings.pkl', 'rb') as f:
-    data = pickle.load(f)
-
-embeddings = data['embeddings']
-word2idx = data['word2idx']
-idx2word = data['idx2word']
 
 # Precompute negative sampling distribution below
 
