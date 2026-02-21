@@ -53,7 +53,7 @@ cdk.out/
 
 
 *.pkl
-*.pt
+!data/tokenizer/tokenizer.pkl
 *.pth
 *.onnx
 *.npy
