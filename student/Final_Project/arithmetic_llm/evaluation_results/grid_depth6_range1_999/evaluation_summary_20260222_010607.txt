@@ -1,0 +1,99 @@
+============================================================
+ARITHMETIC LLM EVALUATION SUMMARY
+============================================================
+
+Model: arithmetic_llm/models/instruction_20260221_044544_481715/best_model.pt
+Tokenizer: arithmetic_llm/data/tokenizer
+Timestamp: 20260222_010607
+
+METRICS:
+------------------------------------------------------------
+Total Samples: 1000
+Correct Samples: 24
+Parseable Samples: 752
+Exact Match Accuracy: 2.40%
+Parse Success Rate: 75.20%
+Avg Generation Length: 215.04 tokens
+
+SAMPLE OUTPUTS:
+------------------------------------------------------------
+
+Sample 1:
+  Expression: 563
+  Ground Truth: 563
+  Predicted: ERROR
+  Correct: False
+  Generated Text:
+    Evaluate : 563 <think> </think> Final Result : ERROR
+
+Sample 2:
+  Expression: 227
+  Ground Truth: 227
+  Predicted: 32
+  Correct: False
+  Generated Text:
+    Evaluate : 227 <think> </think> Final Result : 32
+
+Sample 3:
+  Expression: 469
+  Ground Truth: 469
+  Predicted: 34
+  Correct: False
+  Generated Text:
+    Evaluate : 469 <think> </think> Final Result : 34
+
+Sample 4:
+  Expression: (826 + 758) - 650
+  Ground Truth: 934
+  Predicted: 61
+  Correct: False
+  Generated Text:
+    Evaluate : ( 826 + 758 ) - 650 <think> Step 1 : 26 + 64 = 61 Expression now : 61 </think> Final Result : 61
+
+Sample 5:
+  Expression: 835
+  Ground Truth: 835
+  Predicted: 98
+  Correct: False
+  Generated Text:
+    Evaluate : 835 <think> </think> Final Result : 98
+
+Sample 6:
+  Expression: 173
+  Ground Truth: 173
+  Predicted: 34
+  Correct: False
+  Generated Text:
+    Evaluate : 173 <think> </think> Final Result : 34
+
+Sample 7:
+  Expression: 583 - (((((768 + 698) - (469 + 126)) + ((477 + 832) + (913 + 569))) + ((484 + (726 - 83)) - 929)) - ((((863 - 963) + (337 - 392)) + (311 + (949 + 84))) - (((431 + 527) + (667 - 936)) - 389)))
+  Ground Truth: -2388
+  Predicted: None
+  Correct: False
+  Generated Text:
+    Evaluate : 583 - ( ( ( ( ( 768 + 698 ) - ( 469 + 126 ) ) + ( ( 477 + 832 ) + ( 913 + 569 ) ) ) + ( ( 484 + ( 726 - 83 ) ) - 929 ) ) - ( ( ( ( 863 - 963 ) + ( 337 - 392 ) ) + ( 311 + ( 949 + 84 ) ) ) - ( ( ( 431 + 527 ) + ( 667 - 936 ) ) - 389 ) ) ) <think> <think> Step 2 : ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( ) ) ( ( ( ( ( ( ( ( ( ( ( ( (
+
+Sample 8:
+  Expression: ((124 + (((632 - 329) - (861 + 356)) + 811)) + (977 + (((528 - 894) + 97) + ((135 - 533) + (126 + 286))))) - ((((747 - (359 - 113)) + 818) - 424) + ((((742 - 469) - (800 + 68)) - ((683 + 469) - (881 + 647))) - (326 - (864 - (196 - 898)))))
+  Ground Truth: -1173
+  Predicted: 61
+  Correct: False
+  Generated Text:
+    Evaluate : ( ( 124 + ( ( ( 632 - 329 ) - ( 861 + 356 ) ) + 811 ) ) + ( 977 + ( ( ( 528 - 894 ) + 97 ) + ( ( 135 - 533 ) + ( 126 + 286 ) ) ) ) ) - ( ( ( ( 747 - ( 359 - 113 ) ) + 818 ) - 424 ) + ( ( ( ( 742 - 469 ) - ( 800 + 68 ) ) - ( ( 683 + 469 ) - ( 881 + 647 ) ) ) - ( 326 - ( 864 - ( 196 - 898 ) ) ) ) ) <think> Step 2 : ( ( ( ( ( ( ( ( ( ( ( ( ( ( ( 0 - 10 - 10 - 10 - 10 ) - ( ( ( ( ( ( ( ( ( 9 - 9 ) - 8 + 7 ) - 7 ) - ( 7 + 7 ) - 7 ) - ( 7 - 7 ) ) - ( 7 - 7 ) ) Step 61 </think> Final Result : 61 + 63 = 88 55 = 88 Expression now : 88 + ( ( ( ( ( 1 - ( 1 - 1 ) ) + ( ( ( ( ( ( ( ( ( ( ( ( 10 - 10 ) - 10 ) - ( ( ( ( ( ( ( ( 9 - 7 - 7 ) - 7 ) - 7 ) - ( 7 - 7 ) - ( 7 - 7 ) ) - ( 7 - 7 - 7 ) ) ) Step 8 Step 8 : 1 - 7 = - ( ( ( ( ( ( ( ( ( 7 - 7 - 7 - 7 ) - 7 - 7 ) - ( 7 - 7 + 7 ) ) - ( ( 7 - 7 - 7 - 7 ) ) - ( ( 7 - 7 - 7 ) ) Step 8 : 1 - 7 = - ( ( ( ( ( ( ( ( 7 - 7 - 7 ) - 7 - 7 ) - ( 7 - 7 - 7 ) ) - ( ( 7 - 7 - 7 ) - 7 - 7 - 7 - 7 - 7 ) ) ) Step 8 : 88 + - ( ( ( ( ( ( ( 7 - 7 - 7 ) - ( ( 7 - 7 - 7 ) - 7 ) - ( ( 7 - 7 ) - ( 7 - 7 - 7 ) ) ) Step 9 : 88 + - ( ( ( ( 7 - 7 - 7 ) - ( ( ( 7 - 7 - 7
+
+Sample 9:
+  Expression: 518
+  Ground Truth: 518
+  Predicted: 37
+  Correct: False
+  Generated Text:
+    Evaluate : 518 <think> </think> Final Result : 37
+
+Sample 10:
+  Expression: (((((398 - 89) + (100 + 924)) + 99) - ((661 + 174) + ((20 - 709) - 913))) - 781) + (((880 - ((166 + 624) - 264)) - 464) - (204 + (((211 + 906) - (142 + 422)) - (74 - (206 + 423)))))
+  Ground Truth: -4
+  Predicted: None
+  Correct: False
+  Generated Text:
+    Evaluate : ( ( ( ( ( 398 - 89 ) + ( 100 + 924 ) ) + 99 ) - ( ( 661 + 174 ) + ( ( 20 - 709 ) - 913 ) ) ) - 781 ) + ( ( ( 880 - ( ( 166 + 624 ) - 264 ) ) - 464 ) - ( 204 + ( ( ( 211 + 906 ) - ( 142 + 422 ) ) - ( 74 - ( 206 + 423 ) ) ) ) ) <think> <think> Step 2 : ( ( 6 - 22 = - 16 Expression now : ( ( - 16 + ( 5 + 24 ) ) + ( ( 20 + 6 ) + ( ( 20 - 9 ) - 7 ) ) - ( 6 - ( ( 8 + 7 ) - ( 6 + 6 ) ) ) Step 3 : 5 + 24 = 29 Expression now : ( ( - 16 + 29 ) + ( ( 20 + 6 ) + ( ( 20 - 9 ) - 7 ) ) - ( 6 - ( ( 8 + 7 ) - ( 6 + 6 ) ) ) Step 4 : - 16 + 29 = 13 Expression now : ( 13 + ( ( 20 + 6 ) + ( ( 20 - 9 ) - 7 ) ) - ( 6 - ( ( 8 + 7 ) - ( 6 + 6 ) ) ) Step 5 : 20 + 6 = 26 Expression now : ( 13 + ( 26 + ( 20 - 9 ) ) ) - ( 6 - ( ( 8 + 7 ) - ( 6 + 6 ) ) ) Step 6 : 20 - 9 = 11 Expression now : ( 13 + ( 26 + 11 ) ) - ( 6 - ( ( 8 + 7 ) - ( 6 + 6 ) ) ) Step 7 : 26 + 11 = 37 Expression now : ( 13 + 37 ) - ( 6 - ( ( 8 + 7 ) - ( 6 + 6 ) ) ) Step 8 : 13 + 37 = 50 Expression now : 50 - ( 6 - ( ( 8 + 7 ) - ( 6 + 6 ) ) ) Step 9 : 8 + 7 = 15 Expression now : 50 - ( 6 - ( 15 - ( 6 + 6 ) ) ) Step 10 : 6 + 6 = 12 Expression now : 50 - ( 6 - ( 15 - 12 ) ) Step 11 : 15 - 12 = 3 Expression now : 50 - ( 6 - 3 ) Step 12 : 6 - 3 = 3 Expression now : 50 - 3 Step 13 : 50 -
