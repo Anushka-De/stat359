@@ -334,9 +334,9 @@ class ModelEvaluator:
                     if predicted_result == ground_truth:
                         correct += 1
                 
-                # Save sample outputs (first 10)
+                # Save sample outputs
                 global_idx = batch_start + i
-                if global_idx < 10:
+                if global_idx < len(test_expressions):
                     sample_outputs.append({
                         'expression': expression,
                         'ground_truth': ground_truth,
