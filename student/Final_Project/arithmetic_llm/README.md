@@ -16,6 +16,7 @@ The training process consists of two phases:
 1. **Foundational Training**: Train a base model on arithmetic expressions and evaluations
 2. **Instruction Fine-tuning**: Fine-tune the model to respond to instruction prompts with structured reasoning
 
+
 ### Data Format
 
 The system uses **JSONL (JSON Lines)** format for corpus data. Each line is a JSON object with structured fields:
@@ -355,70 +356,6 @@ python run_instruction_training.py \
 
 **Note:** Fine-tuning typically uses a lower learning rate and fewer epochs than foundational training.
 
-### 4.1 LoRA Instruction Fine-tuning
-
-Fine-tune with LoRA adapters for parameter-efficient training.
-
-```bash
-python run_instruction_training_lora.py \
-  --instruction-corpus-path data/instruction_corpus.txt \
-  --tokenizer-path data/tokenizer \
-  --foundational-checkpoint models/foundational_YYYYMMDD_HHMMSS/best_model.pt \
-  --output-dir models \
-  --num-epochs 3 \
-  --batch-size 32 \
-  --learning-rate 5e-5 \
-  --lora-rank 8 \
-  --lora-alpha 16 \
-  --lora-target-modules attention \
-  --lora-dropout 0.0 \
-  --save-merged-model
-```
-
-**Parameters (LoRA-specific):**
-- `--lora-rank`: LoRA rank (default: 8)
-- `--lora-alpha`: LoRA alpha scaling (default: 16.0)
-- `--lora-target-modules`: Comma-separated target modules (attention, feedforward)
-- `--lora-dropout`: LoRA dropout rate (default: 0.0)
-- `--save-merged-model`: Save merged model for inference
-
-**Outputs:**
-- `lora_adapter.pt`: LoRA adapter weights
-- `merged_model.pt`: Optional merged model when `--save-merged-model` is used
-
-### 4.2 GRPO Training
-
-Train with Group Relative Policy Optimization (GRPO) using verifiable rewards.
-
-```bash
-python run_grpo_training.py \
-  --instruction-corpus data/instruction_corpus.txt \
-  --tokenizer data/tokenizer \
-  --sft-checkpoint models/instruction_YYYYMMDD_HHMMSS/best_model.pt \
-  --output-dir models/grpo \
-  --num-epochs 3 \
-  --batch-size 8 \
-  --num-candidates 4 \
-  --temperature 0.8 \
-  --kl-penalty-coef 0.05
-```
-
-**Parameters:**
-- `--instruction-corpus`: Instruction corpus JSONL (required for instruction mode)
-- `--tokenizer`: Tokenizer directory (required)
-- `--sft-checkpoint`: SFT checkpoint path (required)
-- `--output-dir`: Output directory for checkpoints and logs
-- `--data-mode`: `instruction` or `generated` (default: instruction)
-- `--num-candidates`: Candidates per prompt (default: 4)
-- `--kl-penalty-coef`: KL penalty coefficient (default: 0.05)
-- `--temperature`, `--top-k`, `--top-p`: Sampling parameters
-- `--gradient-accumulation-steps`: Accumulate gradients across steps
-
-**Outputs:**
-- `checkpoint_step_N.pt`: Periodic checkpoints
-- `best_model.pt`: Best checkpoint by validation reward rate (if validation enabled)
-- `final_model.pt`: Final checkpoint
-- `grpo_training_log.json`: Training metrics log
 
 ### 5. Model Evaluation
 
@@ -427,16 +364,6 @@ Evaluate the trained model on a test set of arithmetic expressions.
 ```bash
 python run_evaluation.py \
   --model-path models/instruction_YYYYMMDD_HHMMSS/best_model.pt \
-  --tokenizer-path data/tokenizer \
-  --num-samples 1000 \
-  --max-depth 4 \
-  --output-dir evaluation_results
-```
-
-**LoRA Evaluation (merged model):**
-```bash
-python run_evaluation.py \
-  --model-path models/instruction_lora_YYYYMMDD_HHMMSS/merged_model.pt \
   --tokenizer-path data/tokenizer \
   --num-samples 1000 \
   --max-depth 4 \
@@ -476,150 +403,18 @@ Evaluation creates timestamped files:
 - Excellent models: 80%+ accuracy
 - Parse success rate should be >90%
 
-### 6. Interactive Solver
+### 6. Files Generated 
 
-Use the trained model interactively to solve arithmetic problems.
+- **data** : The training corpus
+- **evaluation_results** : evaluation results obtained from various operand range and depth situations
+- **models** : The foundational and instruction model
 
-```bash
-python run_interactive.py \
-  --model-path models/instruction_YYYYMMDD_HHMMSS/best_model.pt \
-  --tokenizer-path data/tokenizer
-```
+### 7. ipynb files
 
-**Parameters:**
-- `--model-path`: Path to instruction-tuned model (required)
-- `--tokenizer-path`: Path to tokenizer directory (required)
-- `--device`: Device for inference (default: auto)
+- **training_instruction_notebook.ipynb** : File containing codes for generating the foundational and instruction models
+- **Project_analysis.ipynb** : File contaning all codes for evaluating the models at various conditions (operand range and depth)
+- **project_visualizations.ipynb** : File containing all the visualizations for the project
 
-**Usage:**
-```
-Enter expression: 5 + (10 - 3)
+### 8. Final Report 
 
-------------------------------------------------------------
-SOLUTION:
-------------------------------------------------------------
-
-Reasoning Steps:
-  Step 1: 10 - 3 = 7
-  Expression now: 5 + 7
-  Step 2: 5 + 7 = 12
-  Expression now: 12
-
-Final Result: 12
-------------------------------------------------------------
-
-Enter expression: exit
-```
-
-**Commands:**
-- Type any arithmetic expression to solve it
-- Type `exit`, `quit`, or `q` to exit
-- Press `Ctrl+C` to exit
-
-
-
-## Troubleshooting
-
-### Out of Memory Errors
-
-If you encounter CUDA out of memory errors:
-1. Reduce batch size: `--batch-size 16` or `--batch-size 8`
-2. Reduce model size: `--d-model 128 --num-layers 4`
-3. Use CPU: `--device cpu` (slower but uses system RAM)
-
-### Low Accuracy
-
-If model accuracy is low:
-1. Generate more training data: `--num-samples 100000` (increase to 100K or more)
-2. Train for more epochs: `--num-epochs 20`
-3. Increase model size: `--d-model 512 --num-layers 8`
-4. Verify corpus quality: Check that expressions are valid and diverse
-5. Ensure sufficient corpus size: At least 50K samples for foundational training
-
-### Tokenizer Issues
-
-If tokenizer produces unexpected results:
-1. Increase vocabulary size: `--vocab-size 2000`
-2. Verify corpus contains diverse expressions
-3. Check that special tokens are preserved
-
-### Training Not Converging
-
-If training loss doesn't decrease:
-1. Reduce learning rate: `--learning-rate 5e-5`
-2. Increase warmup steps: `--warmup-steps 2000`
-3. Check gradient clipping: `--gradient-clip 0.5`
-4. Verify data quality and format
-
-## Advanced Usage
-
-### Custom Training Configuration
-
-Create a JSON configuration file for reproducible training:
-
-```json
-{
-  "learning_rate": 1e-4,
-  "batch_size": 32,
-  "num_epochs": 10,
-  "warmup_steps": 1000,
-  "gradient_clip": 1.0,
-  "save_every": 1000,
-  "eval_every": 500,
-  "device": "cuda"
-}
-```
-
-Use it with:
-```bash
-python run_foundational_training.py \
-  --corpus-path data/corpus.txt \
-  --tokenizer-path data/tokenizer \
-  --config training_config.json
-```
-
-### Custom Model Architecture
-
-Create a model configuration file:
-
-```json
-{
-  "d_model": 512,
-  "nhead": 8,
-  "num_layers": 8,
-  "dim_feedforward": 2048,
-  "dropout": 0.1,
-  "max_seq_length": 512
-}
-```
-
-Use it with:
-```bash
-python run_foundational_training.py \
-  --corpus-path data/corpus.txt \
-  --tokenizer-path data/tokenizer \
-  --model-config model_config.json
-```
-
-### Resuming Training
-
-To resume training from a checkpoint, use the checkpoint as the starting point for a new training run. Note that this starts a new training session rather than continuing the previous one.
-
-### Distributed Training
-
-For multi-GPU training, modify the training scripts to use PyTorch's DistributedDataParallel. This is not currently implemented but can be added by wrapping the model with DDP.
-
-## Performance Tips
-
-1. **Use GPU**: Training on GPU is 10-100x faster than CPU
-2. **Batch Size**: Larger batches (32-64) train faster but use more memory
-3. **Corpus Size**: More data (50K-100K samples) improves accuracy
-4. **Model Size**: Larger models (d_model=512, num_layers=8) are more accurate but slower
-5. **Checkpointing**: Save checkpoints frequently to avoid losing progress
-
-
-## Acknowledgments
-
-- Transformer architecture adapted from the TinyStories project
-- BPE tokenization based on HuggingFace tokenizers library
-- Expression generation and evaluation utilities from existing codebase
+The Final_Report.pdf 
